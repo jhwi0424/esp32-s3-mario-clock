@@ -11,3 +11,18 @@ sdkconfig*
 .vscode
 
 dependencies.lock
+
+# Local tool installations, generated firmware, and private board backups.
+.tools/
+.secrets/
+artifacts/
+__pycache__/
+*.py[cod]
+.venv/
+*.log
+.env
+.env.*
+**/wifi.json
+**/*credentials*.json
+**/backups/
+*.nvs.bin

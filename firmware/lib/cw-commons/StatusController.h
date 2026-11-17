@@ -3,8 +3,7 @@
 #include <Arduino.h>
 #include <Locator.h>
 #include "picopixel.h"
-
-#define ESP32_LED_BUILTIN 2
+#include "CWHardware.h"
 
 const uint8_t CW_STATUS_NTP[] PROGMEM = {
 	0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3f, 0xff, 0xf0, 0x00, 0x40, 0x00, 0x08, 0x01, 
@@ -174,11 +173,12 @@ struct StatusController
 
 	void blink_led(int d, int times)
 	{
+		if (cw::hardware::StatusLed < 0) return;
 		for (int j = 0; j < times; j++)
 		{
-			digitalWrite(ESP32_LED_BUILTIN, HIGH);
+			digitalWrite(cw::hardware::StatusLed, HIGH);
 			delay(d);
-			digitalWrite(ESP32_LED_BUILTIN, LOW);
+			digitalWrite(cw::hardware::StatusLed, LOW);
 			delay(d);
 		}
 	}

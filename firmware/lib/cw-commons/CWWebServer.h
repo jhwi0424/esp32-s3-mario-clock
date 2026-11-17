@@ -4,6 +4,7 @@
 #include <CWPreferences.h>
 #include "StatusController.h"
 #include "SettingsWebPage.h"
+#include <ezTime.h>
 
 #ifndef CLOCKFACE_NAME
   #define CLOCKFACE_NAME "UNKNOWN"
@@ -90,6 +91,14 @@ struct ClockwiseWebServer
       client.println(SETTINGS_PAGE);
     } else if (method == "GET" && path == "/get") {
       getCurrentSettings(client);
+    } else if (method == "GET" && path == "/status") {
+      client.println("HTTP/1.0 200 OK");
+      client.println("Content-Type: application/json");
+      client.println();
+      client.printf("{\"unix\":%lu,\"time_set\":%s,\"rssi\":%d,\"uptime_ms\":%lu}\n",
+                    static_cast<unsigned long>(UTC.now()),
+                    ezt::timeStatus() != timeNotSet ? "true" : "false",
+                    WiFi.RSSI(), static_cast<unsigned long>(millis()));
     } else if (method == "GET" && path == "/read") {
       if (key == "pin") {
         readPin(client, key, value.toInt());
@@ -99,6 +108,14 @@ struct ClockwiseWebServer
       force_restart = true;
     } else if (method == "POST" && path == "/set") {
       ClockwiseParams::getInstance()->load();
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+      if (key == "autoBright" || key == ClockwiseParams::getInstance()->PREF_LDR_PIN ||
+          key == ClockwiseParams::getInstance()->PREF_E_PIN) {
+        client.println("HTTP/1.0 400 Bad Request");
+        client.println();
+        return;
+      }
+#endif
       //a baby seal has died due this ifs
       if (key == ClockwiseParams::getInstance()->PREF_DISPLAY_BRIGHT) {
         ClockwiseParams::getInstance()->displayBright = value.toInt();
@@ -144,6 +161,12 @@ struct ClockwiseWebServer
 
 
   void readPin(WiFiClient client, String key, uint16_t pin) {
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+    // Reading an ADC on a panel output can disconnect that GPIO from DMA.
+    client.println("HTTP/1.0 400 Bad Request");
+    client.println();
+    return;
+#endif
     ClockwiseParams::getInstance()->load();
 
     client.println("HTTP/1.0 204 No Content");
@@ -179,6 +202,9 @@ struct ClockwiseWebServer
     client.printf(HEADER_TEMPLATE_S, "CW_FW_VERSION", CW_FW_VERSION);
     client.printf(HEADER_TEMPLATE_S, "CW_FW_NAME", CW_FW_NAME);
     client.printf(HEADER_TEMPLATE_S, "CLOCKFACE_NAME", CLOCKFACE_NAME);
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+    client.printf(HEADER_TEMPLATE_D, "FixedPanelPins", 1);
+#endif
     client.println();
   }
   

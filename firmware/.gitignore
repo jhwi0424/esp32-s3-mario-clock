@@ -42,6 +42,9 @@
 .gcc-flags.json
 .pio
 
+# Local junction to the selected clockface submodule.
+/lib/cw-cf-0x01
+
 ### vscode ###
 .vscode/*
 !.vscode/settings.json

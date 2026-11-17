@@ -11,6 +11,7 @@ on:
 
 jobs: 
   build:
+    if: github.repository == 'jnthas/clockwise'
     runs-on: ubuntu-latest
     strategy:
       max-parallel: 2

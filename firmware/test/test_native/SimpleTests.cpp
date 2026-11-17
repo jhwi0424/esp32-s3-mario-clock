@@ -24,6 +24,6 @@ int runUnityTests(void) {
 
 
 int main() {
-  runUnityTests();  
+  return runUnityTests();
 }
 

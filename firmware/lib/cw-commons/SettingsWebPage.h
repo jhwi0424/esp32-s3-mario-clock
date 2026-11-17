@@ -181,6 +181,8 @@ const char SETTINGS_PAGE[] PROGMEM = R""""(
       var base = document.querySelector('#base');
       cards.forEach(c => {
 
+        if (settings.fixedpanelpins == '1' && ['autoBright', 'ldrPin', 'E_pin'].includes(c.property)) return;
+
         if (!c.hasOwnProperty('exclusive') || (c.hasOwnProperty('exclusive') && c.exclusive === settings.clockface_name)) {
           var clone = base.cloneNode(true);
           clone.id = c.property + "-card";

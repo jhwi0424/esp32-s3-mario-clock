@@ -1,3 +1,16 @@
+# ESP32-S3 Mario Clock / 64x64 HUB75E
+
+ESP32-S3 N16R8 adaptation of [jnthas/clockwise](https://github.com/jnthas/clockwise), using the Mario clockface and AnimatedPixelClock GPIO allocation.
+
+- **[Wiring, build and setup guide](ESP32S3_MARIO.md)**
+- **[Ready-to-flash firmware](prebuilt/esp32s3/)**
+- No personal Wi-Fi credentials are included in the source or firmware. Configure your own 2.4GHz Wi-Fi on first boot.
+- Verified: 64x64 color display, Beijing time synchronization, and reconnection after restart.
+
+The original project documentation and MIT license are preserved below.
+
+---
+
 ![News GIF](https://github.com/jnthas/clockwise/raw/gh-pages/static/images/news.gif) **[Latest version 1.4.4 released!](https://github.com/jnthas/clockwise/releases/tag/v1.4.4)** | [See full change log](https://github.com/jnthas/clockwise/blob/main/CHANGELOG.md#144---2026-10-05)
 
 ![Clockwise Logo](https://github.com/jnthas/clockwise/blob/gh-pages/static/images/clockwise_logo.png "Clockwise Logo")
