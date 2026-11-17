@@ -1,0 +1,35 @@
+name: ESP32-S3 Mario
+
+on:
+  push:
+    branches: [main, 'feature/**']
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      - name: Install PlatformIO and Mario submodule
+        run: |
+          python -m pip install platformio==6.2.0
+          git submodule update --init firmware/clockfaces/cw-cf-0x01
+      - name: Run native unit tests
+        run: pio test -d firmware -e native
+      - name: Build ESP32-S3 firmware
+        run: pio run -d firmware -e esp32s3-mario-usb
+      - uses: actions/upload-artifact@v4
+        with:
+          name: esp32s3-mario-firmware
+          path: |
+            firmware/.pio/build/esp32s3-mario-usb/firmware.bin
+            firmware/.pio/build/esp32s3-mario-usb/bootloader.bin
+            firmware/.pio/build/esp32s3-mario-usb/partitions.bin

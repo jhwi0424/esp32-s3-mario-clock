@@ -9,11 +9,11 @@
 #include <CWPreferences.h>
 #include <CWWebServer.h>
 #include <StatusController.h>
+#include <CWHardware.h>
+#include <utility>
 
 #define MIN_BRIGHT_DISPLAY_ON 4
 #define MIN_BRIGHT_DISPLAY_OFF 0
-
-#define ESP32_LED_BUILTIN 2
 
 MatrixPanel_I2S_DMA *dma_display = nullptr;
 
@@ -40,25 +40,35 @@ void displaySetup(bool swapBlueGreen, bool swapBlueRed, uint8_t displayBright, u
 {
   HUB75_I2S_CFG mxconfig(64, 64, 1);
 
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+  mxconfig.gpio = {
+    cw::hardware::PinR1, cw::hardware::PinG1, cw::hardware::PinB1,
+    cw::hardware::PinR2, cw::hardware::PinG2, cw::hardware::PinB2,
+    cw::hardware::PinA, cw::hardware::PinB, cw::hardware::PinC,
+    cw::hardware::PinD, cw::hardware::PinE,
+    cw::hardware::PinLatch, cw::hardware::PinOe, cw::hardware::PinClock
+  };
+#endif
+
   if (swapBlueGreen)
   {
     // Swap Blue and Green pins because the panel is RBG instead of RGB.
-    mxconfig.gpio.b1 = 26;
-    mxconfig.gpio.b2 = 12;
-    mxconfig.gpio.g1 = 27;
-    mxconfig.gpio.g2 = 13;
+    std::swap(mxconfig.gpio.b1, mxconfig.gpio.g1);
+    std::swap(mxconfig.gpio.b2, mxconfig.gpio.g2);
   }
 
   if (swapBlueRed)
   {
     // Swap Blue and Red pins. 
-    mxconfig.gpio.b1 = 25;
-    mxconfig.gpio.b2 = 14;
-    mxconfig.gpio.r1 = 27;
-    mxconfig.gpio.r2 = 13;
+    std::swap(mxconfig.gpio.b1, mxconfig.gpio.r1);
+    std::swap(mxconfig.gpio.b2, mxconfig.gpio.r2);
   }
 
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+  mxconfig.gpio.e = cw::hardware::PinE;
+#else
   mxconfig.gpio.e = E_pin;
+#endif
   mxconfig.clkphase = false;
 
   if (isValidDriver(driver)) {
@@ -74,7 +84,12 @@ void displaySetup(bool swapBlueGreen, bool swapBlueRed, uint8_t displayBright, u
 
   // Display Setup
   dma_display = new MatrixPanel_I2S_DMA(mxconfig);
-  dma_display->begin();
+  if (!dma_display->begin()) {
+    Serial.println("[ERROR] HUB75 DMA initialization failed");
+    while (true) { delay(1000); }
+  }
+  Serial.printf("[HUB75] 64x64 initialized, brightness=%u, driver=%u, clock=%lu\n",
+                displayBright, driver, static_cast<unsigned long>(i2cSpeed));
   dma_display->setBrightness8(displayBright);
   dma_display->clearScreen();
   dma_display->setRotation(displayRotation);
@@ -111,13 +126,21 @@ void automaticBrightControl()
 void setup()
 {
   Serial.begin(115200);
-  pinMode(ESP32_LED_BUILTIN, OUTPUT);
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+  delay(500);
+  Serial.printf("[Mario-S3] Flash=%lu PSRAM=%lu; HUB75 R1/G1/B1=1/2/4 R2/G2/B2=5/6/7 A/B/C/D/E=8/9/10/11/12 CLK/LAT/OE=13/14/38\n",
+                static_cast<unsigned long>(ESP.getFlashChipSize()),
+                static_cast<unsigned long>(ESP.getPsramSize()));
+#endif
+  if (cw::hardware::StatusLed >= 0)
+    pinMode(cw::hardware::StatusLed, OUTPUT);
 
   StatusController::getInstance()->blink_led(5, 100);
 
   ClockwiseParams::getInstance()->load();
 
-  pinMode(ClockwiseParams::getInstance()->ldrPin, INPUT);
+  if (ClockwiseParams::getInstance()->autoBrightMax > 0)
+    pinMode(ClockwiseParams::getInstance()->ldrPin, INPUT);
 
   uint8_t driver = ClockwiseParams::getInstance()->driver;
   uint32_t i2cSpeed = ClockwiseParams::getInstance()->i2cSpeed;
@@ -144,6 +167,7 @@ void onNetworkReady()
       ClockwiseParams::getInstance()->ntpServer.c_str(),
       ClockwiseParams::getInstance()->manualPosix.c_str());
   clockface->setup(&cwDateTime);
+  Serial.printf("[Mario] Clockface started. Local time: %s\n", cwDateTime.getFormattedTime().c_str());
 }
 
 void loop()

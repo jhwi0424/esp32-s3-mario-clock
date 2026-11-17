@@ -63,7 +63,43 @@ void CWDateTime::begin(const char *timeZone, bool use24format, const char *ntpSe
 
   this->use24hFormat = use24format;
   ezt::updateNTP();
-  waitForSync(10);
+  if (!waitForSync(10)) {
+    Serial.println("[Time] Initial NTP synchronization timed out; background retries remain enabled.");
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+    // Some networks block UDP/123. HTTP Date supplies a UTC fallback with
+    // one-second resolution; ezTime continues trying NTP in the background.
+    WiFiClient client;
+    client.setTimeout(1500);
+    if (client.connect("www.baidu.com", 80, 2500)) {
+      client.print("HEAD / HTTP/1.1\r\nHost: www.baidu.com\r\nCache-Control: no-cache\r\nConnection: close\r\n\r\n");
+      const uint32_t started = millis();
+      while (client.connected() && millis() - started < 5000U) {
+        String line = client.readStringUntil('\n');
+        line.trim();
+        if (line.startsWith("Date:")) {
+          int day, year, hour, minute, second;
+          char month[4] = {};
+          if (sscanf(line.c_str(), "Date: %*3s, %d %3s %d %d:%d:%d GMT",
+                     &day, month, &year, &hour, &minute, &second) == 6) {
+            const char *months = "JanFebMarAprMayJunJulAugSepOctNovDec";
+            const char *position = strstr(months, month);
+            if (position && strlen(month) == 3 && (position - months) % 3 == 0 &&
+                year >= 2024 && year < 2100 && day >= 1 && day <= 31 &&
+                hour >= 0 && hour <= 23 && minute >= 0 && minute <= 59 &&
+                second >= 0 && second <= 59) {
+              UTC.setTime(ezt::makeTime(hour, minute, second, day,
+                          (position - months) / 3 + 1, year));
+              Serial.println("[Time] Synchronized using HTTP Date fallback.");
+            }
+          }
+          break;
+        }
+        if (line.length() == 0) break;
+      }
+      client.stop();
+    }
+#endif
+  }
 }
 
 void CWDateTime::update()

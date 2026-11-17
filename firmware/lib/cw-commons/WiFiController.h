@@ -7,6 +7,9 @@
 #include "StatusController.h"
 #include <WiFiManager.h>
 #include "WiFiSetupStateMachine.h"
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+#include <esp_wifi.h>
+#endif
 
 ImprovWiFi improvSerial(&Serial);
 
@@ -29,6 +32,15 @@ struct WiFiController
 
   cw::WiFiSetupStateMachine setupFsm;
 
+  WiFiController()
+  {
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+    cw::WiFiSetupStateMachine::Config config;
+    config.staConnectTimeoutMs = 40000;
+    setupFsm = cw::WiFiSetupStateMachine(config);
+#endif
+  }
+
   static WiFiManager &wifiManager()
   {
     // Must outlive begin() because the portal now runs in non-blocking mode.
@@ -41,6 +53,48 @@ struct WiFiController
     static bool ready = false;
     return ready;
   }
+
+  static void startStationConnection(const char *ssid, const char *password)
+  {
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+    // Arduino 2.x leaves SAE PWE unspecified. Support both WPA3 derivation
+    // methods so H2E-capable access points can negotiate with this S3 build.
+    WiFi.setScanMethod(WIFI_ALL_CHANNEL_SCAN);
+    WiFi.setSleep(false);
+    WiFi.begin(ssid, password, 0, nullptr, false);
+    wifi_config_t config = {};
+    if (esp_wifi_get_config(WIFI_IF_STA, &config) == ESP_OK) {
+      config.sta.sae_pwe_h2e = WPA3_SAE_PWE_BOTH;
+      config.sta.pmf_cfg.capable = true;
+      esp_wifi_set_config(WIFI_IF_STA, &config);
+    }
+    esp_wifi_connect();
+#else
+    WiFi.begin(ssid, password);
+#endif
+  }
+
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+  static bool connectImprovWiFi(const char *ssid, const char *password)
+  {
+    if (wifiManager().getConfigPortalActive())
+      wifiManager().stopConfigPortal();
+    WiFi.mode(WIFI_STA);
+    const int found = WiFi.scanNetworks();
+    for (int i = 0; i < found; ++i) {
+      if (WiFi.SSID(i) == ssid)
+        Serial.printf("[WiFi] Target AP: RSSI=%d channel=%d auth=%d\n",
+                      WiFi.RSSI(i), WiFi.channel(i), WiFi.encryptionType(i));
+    }
+    WiFi.scanDelete();
+    startStationConnection(ssid, password);
+    const uint32_t started = millis();
+    while (WiFi.status() != WL_CONNECTED && millis() - started < 40000U)
+      delay(100);
+    Serial.printf("[WiFi] Provisioning connection status=%d\n", WiFi.status());
+    return WiFi.status() == WL_CONNECTED;
+  }
+#endif
 
   static void persistCredentials(const char *ssid, const char *password)
   {
@@ -143,6 +197,13 @@ struct WiFiController
     WiFi.mode(WIFI_STA);
     WiFi.disconnect();
 
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+    WiFi.onEvent([](WiFiEvent_t event, WiFiEventInfo_t info) {
+      Serial.printf("[WiFi] Disconnected, reason=%u\n", info.wifi_sta_disconnected.reason);
+    }, ARDUINO_EVENT_WIFI_STA_DISCONNECTED);
+    improvSerial.setCustomConnectWiFi(connectImprovWiFi);
+#endif
+
     improvSerial.setDeviceInfo(ImprovTypes::ChipFamily::CF_ESP32, CW_FW_NAME, CW_FW_VERSION, "Clockwise");
     improvSerial.onImprovError(onImprovWiFiErrorCb);
     improvSerial.onImprovConnected(onImprovWiFiConnectedCb);
@@ -153,7 +214,7 @@ struct WiFiController
     if (setupFsm.begin(!params->wifiSsid.isEmpty(), millis()) == cw::WiFiSetupAction::StartStationConnect)
     {
       Serial.printf("[WiFi] Connecting to %s\n", params->wifiSsid.c_str());
-      WiFi.begin(params->wifiSsid.c_str(), params->wifiPwd.c_str());
+      startStationConnection(params->wifiSsid.c_str(), params->wifiPwd.c_str());
     }
     else
     {

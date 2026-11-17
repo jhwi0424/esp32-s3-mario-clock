@@ -1,6 +1,7 @@
 #pragma once
 
 #include <Preferences.h>
+#include "CWHardware.h"
 
 #ifndef CW_PREF_DB_NAME
     #define CW_PREF_DB_NAME "clockwise"
@@ -96,20 +97,26 @@ struct ClockwiseParams
         displayBright = preferences.getUInt(PREF_DISPLAY_BRIGHT, 32);
         autoBrightMin = preferences.getUInt(PREF_DISPLAY_ABC_MIN, 0);
         autoBrightMax = preferences.getUInt(PREF_DISPLAY_ABC_MAX, 0);
-        ldrPin = preferences.getUInt(PREF_LDR_PIN, 35);        
-        timeZone = preferences.getString(PREF_TIME_ZONE, "America/Sao_Paulo");
+        ldrPin = preferences.getUInt(PREF_LDR_PIN, cw::hardware::LdrPin);
+        timeZone = preferences.getString(PREF_TIME_ZONE, cw::hardware::DefaultTimezone);
         wifiSsid = preferences.getString(PREF_WIFI_SSID, "");
         wifiPwd = preferences.getString(PREF_WIFI_PASSWORD, "");
-        ntpServer = preferences.getString(PREF_NTP_SERVER, "time.google.com");
+        ntpServer = preferences.getString(PREF_NTP_SERVER, cw::hardware::DefaultNtpServer);
         canvasFile = preferences.getString(PREF_CANVAS_FILE, "");
         canvasServer = preferences.getString(PREF_CANVAS_SERVER, "raw.githubusercontent.com");
-        manualPosix = preferences.getString(PREF_MANUAL_POSIX, "");
+        manualPosix = preferences.getString(PREF_MANUAL_POSIX, cw::hardware::DefaultPosixTz);
         cachedPosix = preferences.getString(PREF_CACHED_POSIX, "");
         cachedTz = preferences.getString(PREF_CACHED_TZ, "");
         displayRotation = preferences.getUInt(PREF_DISPLAY_ROTATION, 0);
-        driver = preferences.getUInt(PREF_DRIVER, 0);
+        driver = preferences.getUInt(PREF_DRIVER, cw::hardware::DefaultPanelDriver);
         i2cSpeed = preferences.getUInt(PREF_I2CSPEED, (uint32_t)8000000);
-        E_pin = preferences.getUInt(PREF_E_PIN, 18);
+        E_pin = preferences.getUInt(PREF_E_PIN, cw::hardware::PinE);
+#if defined(CW_BOARD_ANIMATED_PIXEL_S3)
+        E_pin = cw::hardware::PinE;
+        // No LDR is fitted. Stale settings must never reconfigure HUB75 pins.
+        autoBrightMax = 0;
+        ldrPin = cw::hardware::LdrPin;
+#endif
     }
 
 };
